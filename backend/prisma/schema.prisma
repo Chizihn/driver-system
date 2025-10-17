@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+enum UserRole {
+  ADMIN
+  OFFICER
+}
+
+enum DocumentType {
+  LICENSE
+  INSURANCE
+  REGISTRATION
+}
+
+enum DocumentStatus {
+  VALID
+  EXPIRED
+  SUSPENDED
+  REVOKED
+}
+
+enum VerificationResult {
+  VALID
+  INVALID
+  EXPIRED
+  FORGED
+}
+
+model User {
+  id              String            @id @default(uuid())
+  username        String            @unique
+  email           String            @unique
+  password        String
+  role            UserRole          @default(OFFICER)
+  firstName       String
+  lastName        String
+  badgeNumber     String?           @unique
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  verificationLogs VerificationLog[]
+  auditLogs       AuditLog[]
+  
+  @@index([username])
+  @@index([email])
+  @@map("users")
+}
+
+model Driver {
+  id              String      @id @default(uuid())
+  firstName       String
+  lastName        String
+  middleName      String?
+  dateOfBirth     DateTime
+  phoneNumber     String
+  email           String?
+  address         String
+  stateOfOrigin   String
+  lga             String
+  nationality     String      @default("Nigerian")
+  photo           String?
+  qrCode          String      @unique
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  documents       Document[]
+  verificationLogs VerificationLog[]
+  
+  @@index([qrCode])
+  @@index([phoneNumber])
+  @@map("drivers")
+}
+
+model Document {
+  id              String          @id @default(uuid())
+  driverId        String
+  type            DocumentType
+  documentNumber  String          @unique
+  issueDate       DateTime
+  expiryDate      DateTime
+  issuingAuthority String
+  status          DocumentStatus  @default(VALID)
+  fileUrl         String?
+  qrCode          String          @unique
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  driver          Driver          @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  verificationLogs VerificationLog[]
+  verificationToken String?
+  
+  @@index([documentNumber])
+  @@index([qrCode])
+  @@index([driverId])
+  @@index([expiryDate])
+  @@map("documents")
+}
+
+model VerificationLog {
+  id              String              @id @default(uuid())
+  officerId       String
+  driverId        String
+  documentId      String?
+  result          VerificationResult
+  location        String?
+  notes           String?
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime            @default(now())
+  
+  officer         User                @relation(fields: [officerId], references: [id])
+  driver          Driver              @relation(fields: [driverId], references: [id])
+  document        Document?           @relation(fields: [documentId], references: [id])
+  
+  @@index([officerId])
+  @@index([driverId])
+  @@index([createdAt])
+  @@map("verification_logs")
+}
+
+model AuditLog {
+  id              String      @id @default(uuid())
+  userId          String
+  action          String
+  entity          String
+  entityId        String?
+  changes         Json?
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime    @default(now())
+  
+  user            User        @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@index([entity])
+  @@map("audit_logs")
+}
