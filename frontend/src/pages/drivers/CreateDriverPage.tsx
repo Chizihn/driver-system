@@ -1,8 +1,7 @@
 "use client";
 
 import type React from "react";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -15,9 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 import { driverService } from "@/services/driver";
+
+// Import Nigerian states and LGAs data
+import nigerianStates from "@/data/nigeria-states-lgas.json";
 
 export default function CreateDriverPage() {
   const navigate = useNavigate();
@@ -33,6 +36,18 @@ export default function CreateDriverPage() {
     lga: "",
     nationality: "Nigerian",
   });
+  
+  const [lgas, setLgas] = useState<string[]>([]);
+  
+  // Update LGAs when state changes
+  useEffect(() => {
+    if (formData.stateOfOrigin) {
+      const state = nigerianStates.find(s => s.name === formData.stateOfOrigin);
+      setLgas(state?.lgas || []);
+      // Reset LGA when state changes
+      setFormData(prev => ({ ...prev, lga: "" }));
+    }
+  }, [formData.stateOfOrigin]);
 
   const createMutation = useMutation({
     mutationFn: driverService.createDriver,
@@ -47,7 +62,14 @@ export default function CreateDriverPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate(formData);
+    
+    // Convert date to ISO string
+    const formattedData = {
+      ...formData,
+      dateOfBirth: new Date(formData.dateOfBirth).toISOString()
+    };
+    
+    createMutation.mutate(formattedData);
   };
 
   return (
@@ -150,26 +172,43 @@ export default function CreateDriverPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="stateOfOrigin">State of Origin *</Label>
-                <Input
-                  id="stateOfOrigin"
+                <Select
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, stateOfOrigin: value }))}
                   value={formData.stateOfOrigin}
-                  onChange={(e) =>
-                    setFormData({ ...formData, stateOfOrigin: e.target.value })
-                  }
                   required
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select State" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {nigerianStates.map((state) => (
+                      <SelectItem key={state.name} value={state.name}>
+                        {state.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="lga">Local Government Area *</Label>
-                <Input
-                  id="lga"
+                <Select
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, lga: value }))}
                   value={formData.lga}
-                  onChange={(e) =>
-                    setFormData({ ...formData, lga: e.target.value })
-                  }
+                  disabled={!formData.stateOfOrigin}
                   required
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select LGA" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lgas.map((lga) => (
+                      <SelectItem key={lga} value={lga}>
+                        {lga}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2 md:col-span-2">

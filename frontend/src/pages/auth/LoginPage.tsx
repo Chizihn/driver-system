@@ -51,6 +51,15 @@ export default function LoginPage() {
           <p className="mt-2 text-center text-sm text-gray-600">
             Driver Verification System
           </p>
+          
+          {/* Demo Credentials */}
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm">
+            <h3 className="font-medium text-yellow-800">Test Credentials:</h3>
+            <div className="mt-1 space-y-1 text-yellow-700">
+              <p><span className="font-medium">Admin:</span> admin / admin123</p>
+              <p><span className="font-medium">Officer:</span> officer1 / officer123</p>
+            </div>
+          </div>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="rounded-md shadow-sm -space-y-px">

@@ -3,64 +3,49 @@ import {
   QrCode,
   AlertCircle,
   CheckCircle2,
-  Loader2,
   RotateCcw,
+  Loader2,
 } from "lucide-react";
-import {
-  verificationService,
-  type VerificationResult,
-} from "@/services/verification";
+import QrScanner from "qr-scanner";
+import { verificationService, type VerificationResult } from "@/services/verification";
 import toast from "react-hot-toast";
-
-// QR Code detection using jsQR library (included via CDN in HTML)
-declare const jsQR: any;
 
 export default function QRScannerPage() {
   const [isScanning, setIsScanning] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerificationResult | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [jsQRLoaded, setJsQRLoaded] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scannerRef = useRef<QrScanner | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
 
-  // Load jsQR library
+  // Initialize QR scanner when component mounts
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src =
-      "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js";
-    script.async = true;
-    script.onload = () => {
-      console.log("jsQR loaded successfully");
-      setJsQRLoaded(true);
-    };
-    script.onerror = () => {
-      console.error("Failed to load jsQR");
-      setError("Failed to load QR scanner library");
-      toast.error("Failed to load QR scanner");
-    };
-    document.body.appendChild(script);
+    if (videoRef.current && !scannerRef.current) {
+      scannerRef.current = new QrScanner(
+        videoRef.current,
+        (result) => handleQRCodeScan(result.data),
+        {
+          preferredCamera: "environment",
+          maxScansPerSecond: 10,
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+        }
+      );
+    }
 
     return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
       stopScanner();
     };
   }, []);
 
   const startScanner = async () => {
-    if (!jsQRLoaded) {
-      toast("QR scanner is still loading. Please wait...");
-      return;
-    }
-
     try {
       setError(null);
       setResult(null);
+
+      toast.loading("Initializing camera...");
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -75,18 +60,23 @@ export default function QRScannerPage() {
         streamRef.current = stream;
         await videoRef.current.play();
         setIsScanning(true);
-        detectQRCode();
+        scannerRef.current?.start();
+        toast.dismiss();
+        toast.success("Camera ready. Position QR code in frame.");
       }
     } catch (err) {
       console.error("Error accessing camera:", err);
-      const errorMessage =
-        "Could not access camera. Please ensure you have granted camera permissions.";
+      const errorMessage = "Could not access camera. Please ensure you have granted camera permissions.";
       setError(errorMessage);
       toast.error(errorMessage);
     }
   };
 
   const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop();
+      scannerRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -94,65 +84,7 @@ export default function QRScannerPage() {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
     setIsScanning(false);
-  };
-
-  const detectQRCode = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
-
-    if (!context) return;
-
-    const scan = () => {
-      if (!video || !canvas || !context || !isScanning) return;
-
-      try {
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-
-          context.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = context.getImageData(
-            0,
-            0,
-            canvas.width,
-            canvas.height
-          );
-
-          if (typeof jsQR !== "undefined") {
-            const code = jsQR(
-              imageData.data,
-              imageData.width,
-              imageData.height,
-              {
-                inversionAttempts: "dontInvert",
-              }
-            );
-
-            if (code?.data) {
-              handleQRCodeScan(code.data);
-              return;
-            }
-          }
-        }
-
-        animationFrameRef.current = requestAnimationFrame(scan);
-      } catch (err) {
-        console.error("Error scanning QR code:", err);
-        if (isScanning) {
-          animationFrameRef.current = requestAnimationFrame(scan);
-        }
-      }
-    };
-
-    scan();
   };
 
   const handleQRCodeScan = async (qrCodeData: string) => {
@@ -167,21 +99,17 @@ export default function QRScannerPage() {
 
     try {
       toast.loading("Verifying QR code...");
-      const verificationResult = await verificationService.verifyByQRCode(
-        qrCodeData
-      );
-
+      const verificationResult = await verificationService.verifyByQRCode(qrCodeData);
       setResult(verificationResult);
 
       if (verificationResult.valid) {
-        toast.success("Verification successful");
+        toast.success("Verification successful!");
       } else {
         toast.error(verificationResult.error || "Verification failed");
       }
     } catch (error: any) {
       console.error("Error verifying QR code:", error);
-      const errorMessage =
-        error.response?.data?.message || "Failed to verify QR code";
+      const errorMessage = error.response?.data?.message || "Failed to verify QR code";
       setError(errorMessage);
       setResult({
         valid: false,
@@ -200,270 +128,109 @@ export default function QRScannerPage() {
     startScanner();
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-4 sm:mb-6 md:mb-8 text-center">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-1 sm:mb-2">
-            QR Code Verification
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
-            Scan a driver's QR code to verify their credentials
+    <div className="min-h-screen bg-gray-100 p-4">
+      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="p-4 bg-blue-600 text-white">
+          <h1 className="text-2xl font-bold">QR Code Scanner</h1>
+          <p className="text-sm opacity-90">
+            Scan a driver's QR code to verify their documents
           </p>
         </div>
 
-        {/* Scanner Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-4 sm:mb-6">
-          <div className="relative bg-black aspect-video flex items-center justify-center">
-            {!isScanning && !result && !isVerifying && (
-              <div className="text-center p-4 sm:p-6">
-                <QrCode className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-400 mb-3 sm:mb-4" />
-                <p className="text-sm sm:text-base text-gray-300">
-                  {error || "Camera is not active. Tap start to begin scanning."}
-                </p>
-                {error && (
-                  <button
-                    onClick={startScanner}
-                    className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm sm:text-base flex items-center mx-auto"
-                  >
-                    <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    Try Again
-                  </button>
-                )}
+        <div className="p-4">
+          {isVerifying ? (
+            <div className="text-center py-8">
+              <Loader2 className="w-16 h-16 mx-auto text-blue-500 animate-spin mb-4" />
+              <p className="text-gray-600 mb-6">Verifying QR code, please wait...</p>
+            </div>
+          ) : isScanning ? (
+            <>
+              <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted
+                />
+                <div className="absolute inset-0 border-4 border-blue-400 border-dashed rounded-lg m-2 pointer-events-none"></div>
+                <div className="absolute bottom-4 left-0 right-0 text-center text-white text-sm bg-black bg-opacity-50 p-2">
+                  Position QR code within the frame
+                </div>
               </div>
-            )}
-
-            {isVerifying && (
-              <div className="absolute inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-10 p-4">
-                <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-blue-500 animate-spin mb-3 sm:mb-4" />
-                <p className="text-white text-base sm:text-lg font-medium text-center">
-                  Verifying QR code...
-                </p>
+              <button
+                onClick={stopScanner}
+                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-6 rounded-md font-medium flex items-center justify-center gap-2 mb-4"
+              >
+                <RotateCcw className="w-5 h-5" />
+                Stop Scanning
+              </button>
+            </>
+          ) : result ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
+              <div className={`p-4 sm:p-6 ${result.valid ? "bg-green-50 dark:bg-green-900/20" : "bg-red-50 dark:bg-red-900/20"}`}>
+                <div className="flex items-start">
+                  <div className={`flex-shrink-0 ${result.valid ? "text-green-500" : "text-red-500"}`}>
+                    {result.valid ? (
+                      <CheckCircle2 className="w-8 h-8" />
+                    ) : (
+                      <AlertCircle className="w-8 h-8" />
+                    )}
+                  </div>
+                  <div className="ml-4">
+                    <h3 className={`text-lg font-medium ${result.valid ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200"}`}>
+                      {result.valid ? "Verification Successful" : "Verification Failed"}
+                    </h3>
+                    <p className={`mt-1 text-sm ${result.valid ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>
+                      {result.valid ? "The QR code has been successfully verified." : (result.error || "The QR code could not be verified.")}
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
-
-            <video
-              ref={videoRef}
-              className={`w-full h-full object-cover ${!isScanning ? "hidden" : ""}`}
-              playsInline
-              muted
-              autoPlay
-            />
-            <canvas ref={canvasRef} className="hidden" />
-
-            {isScanning && (
-              <div className="absolute inset-0 border-2 sm:border-4 border-blue-500 border-dashed rounded-lg m-1 sm:m-2 pointer-events-none" />
-            )}
-          </div>
-
-          <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
-              {!isScanning ? (
-                <button
-                  onClick={startScanner}
-                  className="px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center text-sm sm:text-base"
-                  disabled={!jsQRLoaded || isVerifying}
-                >
-                  <QrCode className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 flex-shrink-0" />
-                  Start Scanner
-                </button>
-              ) : (
-                <button
-                  onClick={stopScanner}
-                  className="px-4 sm:px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md flex items-center text-sm sm:text-base"
-                  disabled={isVerifying}
-                >
-                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 flex-shrink-0" />
-                  Stop Scanner
-                </button>
-              )}
-
-              {!isScanning && !isVerifying && result && (
+              <div className="p-4">
                 <button
                   onClick={handleScanAgain}
-                  className="px-4 sm:px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white rounded-md flex items-center text-sm sm:text-base"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-medium flex items-center justify-center gap-2"
                 >
-                  <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 flex-shrink-0" />
-                  Scan Again
+                  <RotateCcw className="w-4 h-4" />
+                  Scan Another Code
                 </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Results Section */}
-        {result && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6 max-h-[70vh] overflow-y-auto">
-            <div
-              className={`p-4 sm:p-6 ${
-                result.valid
-                  ? "bg-green-50 dark:bg-green-900/20"
-                  : "bg-red-50 dark:bg-red-900/20"
-              }`}
-            >
-              <div className="flex items-start">
-                <div
-                  className={`flex-shrink-0 ${
-                    result.valid ? "text-green-500" : "text-red-500"
-                  }`}
-                >
-                  {result.valid ? (
-                    <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8" />
-                  ) : (
-                    <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8" />
-                  )}
-                </div>
-                <div className="ml-3 sm:ml-4">
-                  <h3
-                    className={`text-base sm:text-lg font-medium ${
-                      result.valid
-                        ? "text-green-800 dark:text-green-200"
-                        : "text-red-800 dark:text-red-200"
-                    }`}
-                  >
-                    {result.valid ? "Verification Successful" : "Verification Failed"}
-                  </h3>
-                  <p
-                    className={`mt-1 text-xs sm:text-sm ${
-                      result.valid
-                        ? "text-green-700 dark:text-green-300"
-                        : "text-red-700 dark:text-red-300"
-                    }`}
-                  >
-                    {result.valid
-                      ? "The QR code has been successfully verified."
-                      : result.error || "The QR code could not be verified."}
-                  </p>
-                </div>
               </div>
             </div>
+          ) : (
+            <div className="text-center py-8">
+              <QrCode className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600 mb-6">
+                Click the button below to start scanning a QR code
+              </p>
+              <button
+                onClick={startScanner}
+                className="px-6 py-3 rounded-md font-medium bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Start Scanning
+              </button>
+            </div>
+          )}
 
-            {result.driver && (
-              <div className="p-4 sm:p-6">
-                <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-3 sm:mb-4">
-                  Driver Information
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Full Name
-                    </p>
-                    <p className="mt-1 text-sm sm:text-base text-gray-900 dark:text-white">
-                      {result.driver.firstName} {result.driver.lastName}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Phone Number
-                    </p>
-                    <p className="mt-1 text-sm sm:text-base text-gray-900 dark:text-white">
-                      {result.driver.phoneNumber || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Date of Birth
-                    </p>
-                    <p className="mt-1 text-sm sm:text-base text-gray-900 dark:text-white">
-                      {result.driver.dateOfBirth
-                        ? formatDate(result.driver.dateOfBirth)
-                        : "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
-                      Status
-                    </p>
-                    <p
-                      className={`mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        result.driver.isActive
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
-                          : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200"
-                      }`}
-                    >
-                      {result.driver.isActive ? "Active" : "Inactive"}
-                    </p>
-                  </div>
-                </div>
-
-                {result.verification && (
-                  <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <h4 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-3 sm:mb-4">
-                      Verification Details
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <div>
-                        <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
-                          Verification ID
-                        </p>
-                        <p className="mt-1 text-sm text-gray-900 dark:text-white font-mono break-all">
-                          {result.verification.id}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
-                          Result
-                        </p>
-                        <p
-                          className={`mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            result.verification.result === "VALID"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
-                              : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200"
-                          }`}
-                        >
-                          {result.verification.result}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
-                          Verified On
-                        </p>
-                        <p className="mt-1 text-sm sm:text-base text-gray-900 dark:text-white">
-                          {formatDate(result.verification.timestamp)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+          {process.env.NODE_ENV === "development" && (
+            <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-900/30">
+              <h4 className="text-sm sm:text-base font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                Debug Information
+              </h4>
+              <div className="space-y-2">
+                <p className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-300">
+                  <span className="font-medium">Scanner Status:</span>{" "}
+                  {isScanning ? "Active" : "Inactive"}
+                </p>
+                {error && (
+                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">
+                    <span className="font-medium">Error:</span> {error}
+                  </p>
                 )}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Debug Section - Only show in development */}
-        {process.env.NODE_ENV === "development" && (
-          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-900/30">
-            <h3 className="text-xs sm:text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-              Development Tools
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleQRCodeScan("driver:test123")}
-                className="px-2.5 py-1 text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-md"
-                disabled={isVerifying}
-              >
-                Test Valid QR
-              </button>
-              <button
-                onClick={() => handleQRCodeScan("invalid:test123")}
-                className="px-2.5 py-1 text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-md"
-                disabled={isVerifying}
-              >
-                Test Invalid QR
-              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

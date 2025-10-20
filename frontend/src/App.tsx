@@ -1,5 +1,4 @@
-import type React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuthStore } from "./stores/auth.store";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
@@ -12,41 +11,42 @@ import DocumentsPage from "./pages/documents/DocumentsPage";
 import VerificationHistoryPage from "./pages/verification/VerificationHistoryPage";
 import Layout from "./components/layout/Layout";
 import QRScannerPage from "./pages/verification/QRScannerpage";
+import HomePage from "./pages/home/HomePage";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute() {
   const { isAuthenticated } = useAuthStore();
+  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+}
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
+function PublicRoute() {
+  const { isAuthenticated } = useAuthStore();
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Outlet />;
 }
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<DashboardPage />} />
-          <Route path="verify" element={<VerifyDriverPage />} />
-          <Route path="scan-qr" element={<QRScannerPage />} />
-          <Route path="drivers" element={<DriversListPage />} />
-          <Route path="drivers/new" element={<CreateDriverPage />} />
-          <Route path="drivers/:id" element={<DriverDetailsPage />} />
-          <Route path="documents" element={<DocumentsPage />} />
-          <Route path="history" element={<VerificationHistoryPage />} />
+        <Route element={<PublicRoute />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
         </Route>
+
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/verify" element={<VerifyDriverPage />} />
+            <Route path="/scan-qr" element={<QRScannerPage />} />
+            <Route path="/drivers" element={<DriversListPage />} />
+            <Route path="/drivers/new" element={<CreateDriverPage />} />
+            <Route path="/drivers/:id" element={<DriverDetailsPage />} />
+            <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/history" element={<VerificationHistoryPage />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

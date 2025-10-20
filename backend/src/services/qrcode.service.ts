@@ -3,6 +3,7 @@ import qrcode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
 import { DocumentRepository } from '../repositories/document.repository';
 import { VerificationLogRepository } from '../repositories/verification-log.repository';
+import { DriverRepository } from '../repositories/driver.repository';
 import { VerificationResult } from '@prisma/client';
 
 interface QRCodeData {
@@ -31,11 +32,33 @@ type DocumentWithMetadata = {
 
 export class QRCodeService {
   private docRepo: DocumentRepository;
+  private driverRepo: DriverRepository;
   public verificationLogRepo: VerificationLogRepository;
 
   constructor() {
     this.docRepo = new DocumentRepository();
+    this.driverRepo = new DriverRepository();
     this.verificationLogRepo = new VerificationLogRepository();
+  }
+
+  // Verify driver by phone and date of birth
+  async verifyDriver(phoneNumber: string, dateOfBirth: Date) {
+    // Format date to match database format (YYYY-MM-DD)
+    const dob = new Date(dateOfBirth);
+    const formattedDob = dob.toISOString().split('T')[0];
+    
+    const driver = await this.driverRepo.findByPhoneAndDOB(phoneNumber, formattedDob);
+    
+    if (!driver) {
+      return { success: false, message: 'Driver not found or invalid credentials' };
+    }
+
+    return { 
+      success: true, 
+      driverId: driver.id,
+      firstName: driver.firstName,
+      lastName: driver.lastName
+    };
   }
 
   // Get driver's license document (treated as primary for verification)

@@ -44,6 +44,24 @@ export class DriverRepository extends BaseRepository<Driver> {
     });
   }
 
+  async findByPhoneAndDOB(phoneNumber: string, dateOfBirth: string) {
+    return this.model.findFirst({
+      where: {
+        phoneNumber,
+        dateOfBirth: {
+          equals: new Date(dateOfBirth),
+        },
+      },
+      include: {
+        documents: {
+          where: { type: 'LICENSE' },
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      },
+    });
+  }
+
   async findWithDocuments(id: string) {
     return this.model.findUnique({
       where: { id },

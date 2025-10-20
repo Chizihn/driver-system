@@ -1,12 +1,18 @@
-import {
-  PrismaClient,
-  UserRole,
-  DocumentType,
-  DocumentStatus,
-} from "@prisma/client";
+import { PrismaClient, UserRole, DocumentType, DocumentStatus, VerificationResult } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
+
+// Helper to generate QR code data
+const generateQRCodeData = (driverId: string, documentId: string) => {
+  return JSON.stringify({
+    documentId,
+    driverId,
+    timestamp: Date.now(),
+    token: uuidv4()
+  });
+};
 
 async function main() {
   console.log("🌱 Starting seed...");
@@ -43,104 +49,129 @@ async function main() {
     },
   });
 
-  // Create sample drivers
-  const driver1 = await prisma.driver.create({
+  // Create test driver with valid documents
+  const testDriver = await prisma.driver.create({
     data: {
-      firstName: "Ahmed",
-      lastName: "Ibrahim",
-      middleName: "Musa",
-      dateOfBirth: new Date("1985-03-15"),
-      phoneNumber: "+2348012345678",
-      email: "ahmed.ibrahim@example.com",
-      address: "123 Lagos Street, Victoria Island, Lagos",
+      firstName: "Test",
+      lastName: "Driver",
+      middleName: "QR",
+      dateOfBirth: new Date("1990-01-01"),
+      phoneNumber: "+2347000000001",
+      email: "test.driver@example.com",
+      address: "123 Test Street, Test City",
       stateOfOrigin: "Lagos",
-      lga: "Lagos Island",
+      lga: "Ikeja",
       nationality: "Nigerian",
-      qrCode: "DRV001QR",
+      isActive: true,
     },
   });
 
-  const driver2 = await prisma.driver.create({
-    data: {
-      firstName: "Fatima",
-      lastName: "Abdullahi",
-      dateOfBirth: new Date("1990-07-22"),
-      phoneNumber: "+2348087654321",
-      email: "fatima.abdullahi@example.com",
-      address: "456 Kano Road, Sabon Gari, Kano",
-      stateOfOrigin: "Kano",
-      lga: "Sabon Gari",
-      nationality: "Nigerian",
-      qrCode: "DRV002QR",
+  // Create test officer for verification
+  const testOfficerPassword = await bcrypt.hash("testofficer123", 12);
+  const testOfficer = await prisma.user.upsert({
+    where: { username: "testofficer" },
+    update: {},
+    create: {
+      username: "testofficer",
+      email: "test.officer@example.com",
+      password: testOfficerPassword,
+      firstName: "Test",
+      lastName: "Officer",
+      role: UserRole.OFFICER,
+      badgeNumber: "TST001",
     },
   });
 
-  // Create sample documents
-  await prisma.document.create({
+  // Create test documents for the driver
+  const licenseDoc = await prisma.document.create({
     data: {
-      driverId: driver1.id,
+      driverId: testDriver.id,
       type: DocumentType.LICENSE,
-      documentNumber: "LIC001234567",
-      issueDate: new Date("2020-01-15"),
-      expiryDate: new Date("2025-01-15"),
-      issuingAuthority: "Federal Road Safety Corps",
-      status: DocumentStatus.VALID,
-      qrCode: "DOC001QR",
-    },
-  });
-
-  await prisma.document.create({
-    data: {
-      driverId: driver1.id,
-      type: DocumentType.INSURANCE,
-      documentNumber: "INS001234567",
+      documentNumber: "TESTLIC123456",
       issueDate: new Date("2023-01-01"),
-      expiryDate: new Date("2024-01-01"),
-      issuingAuthority: "AIICO Insurance",
-      status: DocumentStatus.EXPIRED,
-      qrCode: "DOC002QR",
+      expiryDate: new Date("2030-01-01"),
+      issuingAuthority: "FRSC Test",
+      status: DocumentStatus.VALID,
+      qrCode: generateQRCodeData(testDriver.id, `doc_${uuidv4()}`),
     },
   });
 
+  const insuranceDoc = await prisma.document.create({
+    data: {
+      driverId: testDriver.id,
+      type: DocumentType.INSURANCE,
+      documentNumber: "TESTINS123456",
+      issueDate: new Date("2023-01-01"),
+      expiryDate: new Date("2024-12-31"),
+      issuingAuthority: "Test Insurance Co.",
+      status: DocumentStatus.VALID,
+      qrCode: generateQRCodeData(testDriver.id, `doc_${uuidv4()}`),
+    },
+  });
+
+  // Update driver with QR code from license
+  await prisma.driver.update({
+    where: { id: testDriver.id },
+    data: {
+      qrCode: generateQRCodeData(testDriver.id, licenseDoc.id)
+    },
+  });
+
+  // Create test verification log
+  await prisma.verificationLog.create({
+    data: {
+      officerId: testOfficer.id,
+      driverId: testDriver.id,
+      documentId: licenseDoc.id,
+      result: VerificationResult.VALID,
+      location: "Test Checkpoint",
+      notes: "Initial test verification",
+      ipAddress: "127.0.0.1",
+    },
+  });
+
+  // Create additional test documents for the test driver
   await prisma.document.create({
     data: {
-      driverId: driver2.id,
-      type: DocumentType.LICENSE,
-      documentNumber: "LIC002345678",
-      issueDate: new Date("2021-06-10"),
-      expiryDate: new Date("2026-06-10"),
-      issuingAuthority: "Federal Road Safety Corps",
+      driverId: testDriver.id,
+      type: DocumentType.REGISTRATION,
+      documentNumber: "TESTREG123456",
+      issueDate: new Date("2023-01-01"),
+      expiryDate: new Date("2030-12-31"),
+      issuingAuthority: "Lagos State Motor Vehicle Admin",
       status: DocumentStatus.VALID,
-      qrCode: "DOC003QR",
+      qrCode: generateQRCodeData(testDriver.id, `doc_${uuidv4()}`),
     },
   });
 
-  // Create sample verification logs
+  // Create additional test verification logs
   await prisma.verificationLog.create({
     data: {
-      officerId: officer.id,
-      driverId: driver1.id,
-      result: "VALID",
-      location: "Lagos Checkpoint",
-      notes: "Routine verification",
-      ipAddress: "192.168.1.1",
-    },
-  });
-
-  await prisma.verificationLog.create({
-    data: {
-      officerId: officer.id,
-      driverId: driver2.id,
-      result: "VALID",
-      location: "Kano Checkpoint",
-      notes: "Document verification successful",
-      ipAddress: "192.168.1.2",
+      officerId: testOfficer.id,
+      driverId: testDriver.id,
+      documentId: licenseDoc.id,
+      result: VerificationResult.VALID,
+      location: "Test Checkpoint 2",
+      notes: "Follow-up verification",
+      ipAddress: "127.0.0.2",
     },
   });
 
   console.log("✅ Seed completed successfully!");
+  console.log("\n🔑 Test Credentials:");
   console.log("👤 Admin user: admin / admin123");
   console.log("👮 Officer user: officer1 / officer123");
+  console.log("👮 Test Officer: testofficer / testofficer123");
+  
+  console.log("\n🔗 Test Driver QR Code Data:", {
+    driverId: testDriver.id,
+    licenseId: licenseDoc.id,
+    qrCode: generateQRCodeData(testDriver.id, licenseDoc.id)
+  });
+  
+  console.log("\n🔍 Test QR Code Verification Endpoint:");
+  console.log(`POST /api/qr/verify`);
+  console.log(`Body: { "qrCodeData": "${generateQRCodeData(testDriver.id, licenseDoc.id)}" }`);
 }
 
 main()

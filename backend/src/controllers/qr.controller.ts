@@ -4,8 +4,47 @@ import { QRCodeService } from '../services/qrcode.service';
 import { AuthenticatedRequest } from '../types';
 import { ResponseUtil } from '../utils/response.util';
 import { VerificationResult } from '@prisma/client';
+import { validationResult } from 'express-validator';
 
 export class QRCodeController {
+  // For drivers to request their QR code using phone and DOB (no auth required)
+  requestQRCode = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const errorMessages = errors.array().map(err => {
+          const error = err as any; // Type assertion to access properties
+          return `${error.param || 'field'}: ${error.msg || 'is invalid'}`;
+        }).join(', ');
+        return ResponseUtil.error(res, `Validation failed: ${errorMessages}`, 400);
+      }
+
+      const { phoneNumber, dateOfBirth } = req.body;
+      
+      // Verify driver
+      const verification = await this.qrCodeService.verifyDriver(phoneNumber, new Date(dateOfBirth));
+      
+      if (!verification.success) {
+        return ResponseUtil.error(res, verification.message || 'Verification failed', 401);
+      }
+
+      // Generate QR code
+      const document = await this.qrCodeService.getDriverPrimaryDocument(verification.driverId);
+      
+      if (!document) {
+        return ResponseUtil.error(res, 'No valid documents found', 404);
+      }
+
+      const qrCodeDataURL = await this.qrCodeService.generateQRCode(verification.driverId, document.id);
+      
+      return ResponseUtil.success(res, 'QR code generated successfully', { 
+        qrCodeDataURL,
+        driverName: `${verification.firstName} ${verification.lastName}`
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
   private qrCodeService: QRCodeService;
 
   constructor() {

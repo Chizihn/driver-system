@@ -73,7 +73,7 @@ model Driver {
   lga             String
   nationality     String      @default("Nigerian")
   photo           String?
-  qrCode          String      @unique
+  qrCode          String?     @unique
   isActive        Boolean     @default(true)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -96,7 +96,7 @@ model Document {
   issuingAuthority String
   status          DocumentStatus  @default(VALID)
   fileUrl         String?
-  qrCode          String          @unique
+  qrCode          String?         @unique
   metadata        Json?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
