@@ -31,7 +31,14 @@ export default function QRScannerPage() {
       setResult(null);
       setIsScanning(true);
 
-      if (!videoRef.current) return;
+      // Wait a bit for the video element to be rendered in the DOM
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      if (!videoRef.current) {
+        toast.error("Video element not ready");
+        setIsScanning(false);
+        return;
+      }
 
       if (scannerRef.current) {
         scannerRef.current.destroy();
@@ -48,11 +55,21 @@ export default function QRScannerPage() {
       );
 
       await scannerRef.current.start();
-      toast.success("Scanning... Point camera at QR code");
+      toast.success("Camera active - scan QR code", { duration: 2000 });
     } catch (err: any) {
       console.error("Scanner error:", err);
       setIsScanning(false);
-      toast.error("Failed to start camera. Please check permissions.");
+      
+      let errorMsg = "Failed to start camera";
+      if (err.name === "NotAllowedError") {
+        errorMsg = "Camera permission denied";
+      } else if (err.name === "NotFoundError") {
+        errorMsg = "No camera found";
+      } else if (err.name === "NotReadableError") {
+        errorMsg = "Camera already in use";
+      }
+      
+      toast.error(errorMsg);
     }
   };
 
