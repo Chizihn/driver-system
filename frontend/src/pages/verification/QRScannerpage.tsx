@@ -132,7 +132,7 @@ export default function QRScannerPage() {
             </div>
           ) : isScanning ? (
             <>
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
+              <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden mb-4">
                 <video
                   ref={videoRef}
                   className="w-full h-full object-cover"
@@ -159,9 +159,9 @@ export default function QRScannerPage() {
                 <div className="flex items-start">
                   <div className={`flex-shrink-0 ${result.valid ? "text-green-500" : "text-red-500"}`}>
                     {result.valid ? (
-                      <CheckCircle2 className="w-8 h-8" />
+                      <CheckCircle2 className="h-8 w-8" />
                     ) : (
-                      <AlertCircle className="w-8 h-8" />
+                      <AlertCircle className="h-8 w-8" />
                     )}
                   </div>
                   <div className="ml-4">
@@ -174,13 +174,87 @@ export default function QRScannerPage() {
                   </div>
                 </div>
               </div>
-              <div className="p-4">
+              <div className="p-6 border-t border-gray-200">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Verification Details</h4>
+                <div className="space-y-2 text-sm text-gray-700">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Status</span>
+                    <span className={`font-medium ${result.valid ? 'text-green-600' : 'text-red-600'}`}>
+                      {result.valid ? "Valid" : "Invalid"}
+                    </span>
+                  </div>
+                  {result.verification && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Verification ID</span>
+                        <span className="font-mono text-sm">
+                          {result.verification.id}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Result</span>
+                        <span className="font-medium">
+                          {result.verification.result}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Verified At</span>
+                        <span>
+                          {new Date(result.verification.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  {result.driver && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <h5 className="font-medium text-gray-900 mb-2">Driver Information</h5>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Name</span>
+                          <span>{result.driver.firstName} {result.driver.lastName}</span>
+                        </div>
+                        {result.driver.phoneNumber && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Phone</span>
+                            <span>{result.driver.phoneNumber}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">QR Code</span>
+                          <span className="font-mono text-xs">{result.driver.qrCode}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {result.document && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <h5 className="font-medium text-gray-900 mb-2">Document Information</h5>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Type</span>
+                          <span>{result.document.type}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Number</span>
+                          <span>{result.document.documentNumber}</span>
+                        </div>
+                        {result.document.expiryDate && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Expires</span>
+                            <span>{new Date(result.document.expiryDate).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="bg-gray-50 px-6 py-4 sm:px-6 flex justify-end">
                 <button
                   onClick={handleScanAgain}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-medium flex items-center justify-center gap-2"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  Scan Another Code
+                  Scan Again
                 </button>
               </div>
             </div>
