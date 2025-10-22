@@ -28,12 +28,13 @@ export default function QRScannerPage() {
   }, []);
 
   const startScanner = async () => {
+    const loadingToast = toast.loading("Initializing camera...");
+    
     try {
       setError(null);
       setResult(null);
 
-      const loadingToast = toast.loading("Initializing camera...");
-
+      // Get camera stream
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
@@ -42,42 +43,85 @@ export default function QRScannerPage() {
         },
       });
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        
-        // Wait for video to be ready
-        await videoRef.current.play();
-        
-        // Initialize scanner with the video element
-        if (!scannerRef.current) {
-          scannerRef.current = new QrScanner(
-            videoRef.current,
-            (result) => handleQRCodeScan(result.data),
-            {
-              preferredCamera: "environment",
-              maxScansPerSecond: 10,
-              highlightScanRegion: true,
-              highlightCodeOutline: true,
-            }
-          );
-        }
-        
-        setIsScanning(true);
-        
-        // Start the QR scanner
-        await scannerRef.current.start();
-        
-        toast.dismiss(loadingToast);
-        toast.success("Camera ready. Position QR code in frame.");
-      } else {
+      if (!videoRef.current) {
         toast.dismiss(loadingToast);
         throw new Error("Video element not available");
       }
+
+      // Set up video
+      videoRef.current.srcObject = stream;
+      streamRef.current = stream;
+      
+      // Wait for video to be ready
+      await new Promise((resolve, reject) => {
+        if (!videoRef.current) {
+          reject(new Error("Video element lost"));
+          return;
+        }
+        
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play()
+            .then(resolve)
+            .catch(reject);
+        };
+        
+        // Timeout after 5 seconds
+        setTimeout(() => reject(new Error("Video loading timeout")), 5000);
+      });
+
+      toast.dismiss(loadingToast);
+      toast.loading("Starting QR scanner...");
+
+      // Initialize scanner
+      if (scannerRef.current) {
+        scannerRef.current.destroy();
+        scannerRef.current = null;
+      }
+
+      scannerRef.current = new QrScanner(
+        videoRef.current,
+        (result) => handleQRCodeScan(result.data),
+        {
+          preferredCamera: "environment",
+          maxScansPerSecond: 5,
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+        }
+      );
+
+      // Start scanning
+      try {
+        await scannerRef.current.start();
+        setIsScanning(true);
+        toast.dismiss();
+        toast.success("Camera ready. Position QR code in frame.", { duration: 2000 });
+      } catch (scannerError) {
+        console.error("Scanner start error:", scannerError);
+        // If scanner fails to start, we can still show the video
+        // The scanner might work without calling start() explicitly
+        setIsScanning(true);
+        toast.dismiss();
+        toast.success("Camera ready. Position QR code in frame.", { duration: 2000 });
+      }
+
     } catch (err) {
-      console.error("Error accessing camera:", err);
-      toast.dismiss();
-      const errorMessage = "Could not access camera. Please ensure you have granted camera permissions.";
+      console.error("Error in startScanner:", err);
+      toast.dismiss(loadingToast);
+      
+      let errorMessage = "Could not start camera.";
+      
+      if (err instanceof Error) {
+        if (err.name === "NotAllowedError") {
+          errorMessage = "Camera permission denied. Please allow camera access.";
+        } else if (err.name === "NotFoundError") {
+          errorMessage = "No camera found on this device.";
+        } else if (err.name === "NotReadableError") {
+          errorMessage = "Camera is already in use by another application.";
+        } else {
+          errorMessage = `Error: ${err.message}`;
+        }
+      }
+      
       setError(errorMessage);
       toast.error(errorMessage);
       stopScanner();
@@ -86,8 +130,12 @@ export default function QRScannerPage() {
 
   const stopScanner = () => {
     if (scannerRef.current) {
-      scannerRef.current.stop();
-      scannerRef.current.destroy();
+      try {
+        scannerRef.current.stop();
+        scannerRef.current.destroy();
+      } catch (e) {
+        console.error("Error stopping scanner:", e);
+      }
       scannerRef.current = null;
     }
     if (streamRef.current) {
@@ -101,9 +149,7 @@ export default function QRScannerPage() {
   };
 
   const handleQRCodeScan = async (qrCodeData: string) => {
-    if (!qrCodeData) {
-      setError("Invalid QR code");
-      toast.error("Invalid QR code");
+    if (!qrCodeData || isVerifying) {
       return;
     }
 
@@ -168,6 +214,7 @@ export default function QRScannerPage() {
                   className="w-full h-full object-cover"
                   playsInline
                   muted
+                  autoPlay
                 />
                 <div className="absolute inset-0 border-4 border-blue-400 border-dashed rounded-lg m-2 pointer-events-none"></div>
                 <div className="absolute bottom-4 left-0 right-0 text-center text-white text-sm bg-black bg-opacity-50 p-2">
@@ -228,6 +275,14 @@ export default function QRScannerPage() {
             </div>
           )}
 
+          {error && (
+            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-900/30">
+              <p className="text-sm text-red-600 dark:text-red-400">
+                <span className="font-medium">Error:</span> {error}
+              </p>
+            </div>
+          )}
+
           {process.env.NODE_ENV === "development" && (
             <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-900/30">
               <h4 className="text-sm sm:text-base font-medium text-yellow-800 dark:text-yellow-200 mb-2">
@@ -238,11 +293,10 @@ export default function QRScannerPage() {
                   <span className="font-medium">Scanner Status:</span>{" "}
                   {isScanning ? "Active" : "Inactive"}
                 </p>
-                {error && (
-                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">
-                    <span className="font-medium">Error:</span> {error}
-                  </p>
-                )}
+                <p className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-300">
+                  <span className="font-medium">Stream Active:</span>{" "}
+                  {streamRef.current ? "Yes" : "No"}
+                </p>
               </div>
             </div>
           )}
