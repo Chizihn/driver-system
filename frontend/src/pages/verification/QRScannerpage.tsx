@@ -20,21 +20,8 @@ export default function QRScannerPage() {
   const scannerRef = useRef<QrScanner | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Initialize QR scanner when component mounts
+  // Cleanup on unmount
   useEffect(() => {
-    if (videoRef.current && !scannerRef.current) {
-      scannerRef.current = new QrScanner(
-        videoRef.current,
-        (result) => handleQRCodeScan(result.data),
-        {
-          preferredCamera: "environment",
-          maxScansPerSecond: 10,
-          highlightScanRegion: true,
-          highlightCodeOutline: true,
-        }
-      );
-    }
-
     return () => {
       stopScanner();
     };
@@ -45,7 +32,7 @@ export default function QRScannerPage() {
       setError(null);
       setResult(null);
 
-      toast.loading("Initializing camera...");
+      const loadingToast = toast.loading("Initializing camera...");
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -58,23 +45,49 @@ export default function QRScannerPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
+        
+        // Wait for video to be ready
         await videoRef.current.play();
+        
+        // Initialize scanner with the video element
+        if (!scannerRef.current) {
+          scannerRef.current = new QrScanner(
+            videoRef.current,
+            (result) => handleQRCodeScan(result.data),
+            {
+              preferredCamera: "environment",
+              maxScansPerSecond: 10,
+              highlightScanRegion: true,
+              highlightCodeOutline: true,
+            }
+          );
+        }
+        
         setIsScanning(true);
-        scannerRef.current?.start();
-        toast.dismiss();
+        
+        // Start the QR scanner
+        await scannerRef.current.start();
+        
+        toast.dismiss(loadingToast);
         toast.success("Camera ready. Position QR code in frame.");
+      } else {
+        toast.dismiss(loadingToast);
+        throw new Error("Video element not available");
       }
     } catch (err) {
       console.error("Error accessing camera:", err);
+      toast.dismiss();
       const errorMessage = "Could not access camera. Please ensure you have granted camera permissions.";
       setError(errorMessage);
       toast.error(errorMessage);
+      stopScanner();
     }
   };
 
   const stopScanner = () => {
     if (scannerRef.current) {
       scannerRef.current.stop();
+      scannerRef.current.destroy();
       scannerRef.current = null;
     }
     if (streamRef.current) {
@@ -97,11 +110,14 @@ export default function QRScannerPage() {
     setIsVerifying(true);
     stopScanner();
 
+    const verifyToast = toast.loading("Verifying QR code...");
+
     try {
-      toast.loading("Verifying QR code...");
       const verificationResult = await verificationService.verifyByQRCode(qrCodeData);
       setResult(verificationResult);
 
+      toast.dismiss(verifyToast);
+      
       if (verificationResult.valid) {
         toast.success("Verification successful!");
       } else {
@@ -115,9 +131,9 @@ export default function QRScannerPage() {
         valid: false,
         error: errorMessage,
       });
+      toast.dismiss(verifyToast);
       toast.error(errorMessage);
     } finally {
-      toast.dismiss();
       setIsVerifying(false);
     }
   };

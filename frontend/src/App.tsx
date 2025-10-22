@@ -11,7 +11,6 @@ import DocumentsPage from "./pages/documents/DocumentsPage";
 import VerificationHistoryPage from "./pages/verification/VerificationHistoryPage";
 import Layout from "./components/layout/Layout";
 import QRScannerPage from "./pages/verification/QRScannerpage";
-import HomePage from "./pages/home/HomePage";
 
 function ProtectedRoute() {
   const { isAuthenticated } = useAuthStore();
@@ -28,7 +27,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<PublicRoute />}>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
@@ -46,7 +45,7 @@ function App() {
           </Route>
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );
