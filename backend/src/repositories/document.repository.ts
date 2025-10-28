@@ -23,6 +23,15 @@ export class DocumentRepository extends BaseRepository<Document> {
     });
   }
 
+  async findByQRCode(qrCode: string): Promise<Document | null> {
+    return this.model.findUnique({
+      where: { qrCode },
+      include: {
+        driver: true,
+      },
+    });
+  }
+
   async findExpiringSoon(days: number): Promise<Document[]> {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + days);

@@ -60,7 +60,7 @@ export default function LoginPage() {
       setAuth(data.user, data.accessToken, data.refreshToken);
 
       toast.success("Login successful!");
-      router.push("/"); // ← Next.js navigation
+      router.push("/dashboard"); // ← Next.js navigation
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || "Login failed");
