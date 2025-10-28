@@ -1,13 +1,17 @@
 // src/repositories/driver.repository.ts
-import { Driver, Prisma } from "@prisma/client";
+import { Driver, Prisma, Document } from "@prisma/client";
 import { BaseRepository } from "./base.repository";
+
+export type DriverWithDocuments = Driver & {
+  documents: Document[];
+};
 
 export class DriverRepository extends BaseRepository<Driver> {
   constructor() {
     super("driver");
   }
 
-  async findByQRCode(qrCode: string): Promise<Driver | null> {
+  async findByQRCode(qrCode: string): Promise<DriverWithDocuments | null> {
     return this.model.findUnique({
       where: { qrCode },
       include: {

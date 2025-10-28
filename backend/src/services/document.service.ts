@@ -1,3 +1,5 @@
+// src/services/document.service.ts
+
 import { DocumentRepository } from "../repositories/document.repository";
 
 export class DocumentService {
@@ -33,5 +35,23 @@ export class DocumentService {
 
   async getExpiringSoon(days: number) {
     return this.repo.findExpiringSoon(days);
+  }
+
+  // Add this method
+  async getAllDocuments(search?: string) {
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { documentNumber: { contains: search, mode: "insensitive" } },
+        { type: { contains: search, mode: "insensitive" } },
+        { driver: { name: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    return this.repo.findMany({
+      where,
+      include: { driver: true },
+      orderBy: { createdAt: "desc" },
+    });
   }
 }

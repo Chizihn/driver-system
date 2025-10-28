@@ -11,6 +11,21 @@ export class DocumentController {
     this.documentService = new DocumentService();
   }
 
+  // Fixed: Complete the method
+  getAllDocuments = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const search = req.query.search as string | undefined;
+      const documents = await this.documentService.getAllDocuments(search);
+      ResponseUtil.success(res, "Documents retrieved successfully", documents);
+    } catch (error) {
+      next(error);
+    }
+  };
+
   createDocument = async (
     req: AuthenticatedRequest,
     res: Response,
@@ -39,6 +54,9 @@ export class DocumentController {
       const document = await this.documentService.getDocumentById(
         req.params.id
       );
+      if (!document) {
+        return ResponseUtil.notFound(res, "Document not found");
+      }
       ResponseUtil.success(res, "Document retrieved successfully", document);
     } catch (error) {
       next(error);
@@ -54,6 +72,9 @@ export class DocumentController {
       const document = await this.documentService.getDocumentByNumber(
         req.params.documentNumber
       );
+      if (!document) {
+        return ResponseUtil.notFound(res, "Document not found");
+      }
       ResponseUtil.success(res, "Document retrieved successfully", document);
     } catch (error) {
       next(error);
@@ -85,6 +106,9 @@ export class DocumentController {
         req.params.id,
         req.body
       );
+      if (!document) {
+        return ResponseUtil.notFound(res, "Document not found");
+      }
       ResponseUtil.success(res, "Document updated successfully", document);
     } catch (error) {
       next(error);
@@ -102,6 +126,9 @@ export class DocumentController {
         req.params.id,
         status
       );
+      if (!document) {
+        return ResponseUtil.notFound(res, "Document not found");
+      }
       ResponseUtil.success(
         res,
         "Document status updated successfully",
@@ -118,7 +145,7 @@ export class DocumentController {
     next: NextFunction
   ): Promise<void> => {
     try {
-      const days = parseInt(req.query.days as string) || 30;
+      const days = parseInt(req.query.days as string, 10) || 30;
       const documents = await this.documentService.getExpiringSoon(days);
       ResponseUtil.success(
         res,

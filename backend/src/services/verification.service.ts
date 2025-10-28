@@ -1,6 +1,6 @@
 import { VerificationLogRepository } from "../repositories/verification-log.repository";
 import { DocumentRepository } from "../repositories/document.repository";
-import { DriverRepository } from "../repositories/driver.repository";
+import { DriverRepository, DriverWithDocuments } from "../repositories/driver.repository";
 
 export class VerificationService {
   private logRepo: VerificationLogRepository;
@@ -62,10 +62,16 @@ export class VerificationService {
         };
       }
 
+      // Get the latest document for the driver
+      const latestDocument = driver.documents && driver.documents.length > 0 
+        ? driver.documents[0] 
+        : null;
+
       // Log verification attempt
       const verification = await this.logRepo.create({
         officerId,
         driverId: driver.id,
+        documentId: latestDocument?.id,
         result: driver.isActive ? "VALID" : "INVALID",
         ipAddress,
         userAgent,
@@ -75,7 +81,11 @@ export class VerificationService {
 
       return {
         valid: driver.isActive,
-        driver,
+        driver: {
+          ...driver,
+          documents: undefined, // Remove the documents from the driver object to avoid circular reference
+        },
+        document: latestDocument,
         verification: {
           id: verification.id,
           result: verification.result,

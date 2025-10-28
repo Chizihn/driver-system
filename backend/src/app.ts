@@ -7,8 +7,15 @@ import { ResponseUtil } from "./utils/response.util";
 
 const app = express();
 
+// ✅ Proper CORS setup for credentials
+app.use(
+  cors({
+    origin: ["http://localhost:3000", "https://driver-sys.vercel.app"], // explicitly allow frontend origin
+    credentials: true, // allow cookies or auth headers
+  })
+);
+
 app.use(json());
-app.use(cors());
 app.use(morgan("dev"));
 
 app.use("/api", routes);
@@ -22,7 +29,7 @@ app.use((error: any, req: any, res: any, next: any) => {
   ResponseUtil.error(res, message, status);
 });
 
-// 404
+// 404 handler
 app.use((req, res) => {
   ResponseUtil.error(res as any, "Not Found", 404);
 });

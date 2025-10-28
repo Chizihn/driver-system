@@ -1,129 +1,36 @@
-# Driver Verification System - Frontend
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-A modern, responsive web application for driver verification built with React, TypeScript, and Vite.
+## Getting Started
 
-## 🚀 Features
-
-- **User Authentication**
-  - Login/Logout functionality
-  - Role-based access control
-  - JWT token management
-
-- **QR Code Scanning**
-  - Real-time QR code scanning
-  - Camera access handling
-  - Scan history and results
-
-- **Document Management**
-  - Document upload and preview
-  - Status tracking
-  - Document validation
-
-- **Responsive Design**
-  - Mobile-first approach
-  - Dark/light mode support
-  - Accessible components
-
-## 🛠 Tech Stack
-
-- **Framework**: React 18
-- **Language**: TypeScript
-- **Build Tool**: Vite
-- **State Management**: Zustand
-- **Styling**: Tailwind CSS
-- **UI Components**: Shadcn/UI
-- **Icons**: Lucide React
-- **Form Handling**: React Hook Form + Zod
-- **Routing**: React Router v6
-- **HTTP Client**: Axios
-- **Notifications**: React Hot Toast
-- **QR Code**: jsQR, qrcode
-
-## 📦 Prerequisites
-
-- Node.js 18+
-- npm or yarn
-- Backend API server (see backend README)
-
-## 🚀 Getting Started
-
-### 1. Install Dependencies
-
-```bash
-cd frontend
-npm install
-```
-
-### 2. Environment Setup
-
-1. Copy `.env.example` to `.env`
-2. Update the environment variables:
-
-```env
-VITE_API_URL=http://localhost:4000/api
-VITE_APP_NAME="Driver Verification System"
-```
-
-### 3. Start Development Server
+First, run the development server:
 
 ```bash
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-The app will be available at `http://localhost:5173`
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## 🏗 Project Structure
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-```
-src/
-├── components/    # Reusable UI components
-├── lib/          # Utility functions and configurations
-├── pages/        # Application pages
-├── services/     # API service layer
-├── stores/       # State management
-└── types/        # TypeScript type definitions
-```
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## 🔧 Development
+## Learn More
 
-### Available Scripts
+To learn more about Next.js, take a look at the following resources:
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-### Environment Variables
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | Backend API URL | `http://localhost:4000/api` |
-| `VITE_APP_NAME` | Application name | "Driver Verification System" |
+## Deploy on Vercel
 
-## 🎨 Styling
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-This project uses:
-- Tailwind CSS for utility-first styling
-- Shadcn/UI for accessible components
-- CSS Modules for component-scoped styles
-
-## 🧪 Testing
-
-To run tests:
-
-```bash
-npm test
-```
-
-## 🚀 Deployment
-
-1. Build the application:
-   ```bash
-   npm run build
-   ```
-
-2. The production-ready files will be in the `dist` directory.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

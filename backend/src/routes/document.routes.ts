@@ -6,6 +6,7 @@ const router = Router();
 const ctrl = new DocumentController();
 
 router.use(authMiddleware as any);
+router.get("/", ctrl.getAllDocuments);
 router.post("/", ctrl.createDocument);
 router.get("/expiring", ctrl.getExpiringSoon);
 router.get("/driver/:driverId", ctrl.getDriverDocuments);
